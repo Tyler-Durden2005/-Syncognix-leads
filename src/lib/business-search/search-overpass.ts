@@ -1,6 +1,5 @@
 import "server-only"
 
-import type { OsmElementType } from "@/types/business"
 import {
   OVERPASS_ENDPOINTS,
   OVERPASS_FETCH_TIMEOUT_MS,
@@ -15,6 +14,7 @@ import {
   upstreamError,
   upstreamStatusError,
 } from "./errors"
+import { isOsmElementType, type OsmElement } from "./osm-element"
 import { getOsmUserAgent } from "./user-agent"
 
 /*
@@ -25,22 +25,17 @@ import { getOsmUserAgent } from "./user-agent"
  * https://wiki.openstreetmap.org/wiki/Overpass_API#Public_Overpass_API_instances
  */
 
-export interface OverpassElement {
-  type: OsmElementType
-  id: number
-  lat?: number
-  lon?: number
-  center?: { lat?: number; lon?: number }
-  tags?: Record<string, string>
-}
-
 interface OverpassResponse {
   elements?: unknown
   remark?: string
 }
 
-export async function searchOverpass(query: string): Promise<OverpassElement[]> {
-  const deadline = Date.now() + OVERPASS_TOTAL_BUDGET_MS
+/**
+ * Runs the query, finishing by `deadline` (epoch ms) at the latest so the
+ * whole search stays inside the route's time limit.
+ */
+export async function searchOverpass(query: string, deadline: number): Promise<OsmElement[]> {
+  const end = Math.min(deadline, Date.now() + OVERPASS_TOTAL_BUDGET_MS)
 
   for (let attempt = 1; ; attempt++) {
     const endpoint = OVERPASS_ENDPOINTS[(attempt - 1) % OVERPASS_ENDPOINTS.length]
@@ -48,14 +43,14 @@ export async function searchOverpass(query: string): Promise<OverpassElement[]> 
       return await queryOverpass(
         endpoint,
         query,
-        Math.min(OVERPASS_FETCH_TIMEOUT_MS, deadline - Date.now())
+        Math.min(OVERPASS_FETCH_TIMEOUT_MS, end - Date.now())
       )
     } catch (error) {
       const canRetry =
         error instanceof BusinessSearchError &&
         error.code === "upstream_busy" &&
         attempt < OVERPASS_MAX_ATTEMPTS &&
-        deadline - Date.now() - OVERPASS_RETRY_DELAY_MS >= OVERPASS_MIN_ATTEMPT_MS
+        end - Date.now() - OVERPASS_RETRY_DELAY_MS >= OVERPASS_MIN_ATTEMPT_MS
       if (!canRetry) throw error
 
       console.warn(
@@ -70,7 +65,7 @@ async function queryOverpass(
   endpoint: string,
   query: string,
   timeoutMs: number
-): Promise<OverpassElement[]> {
+): Promise<OsmElement[]> {
   const response = await fetchWithTimeout(
     "overpass",
     endpoint,
@@ -118,11 +113,8 @@ async function queryOverpass(
   return payload.elements.filter(isOverpassElement)
 }
 
-function isOverpassElement(value: unknown): value is OverpassElement {
+function isOverpassElement(value: unknown): value is OsmElement {
   if (!value || typeof value !== "object") return false
-  const element = value as Partial<OverpassElement>
-  return (
-    (element.type === "node" || element.type === "way" || element.type === "relation") &&
-    typeof element.id === "number"
-  )
+  const element = value as Partial<OsmElement>
+  return isOsmElementType(element.type) && typeof element.id === "number"
 }

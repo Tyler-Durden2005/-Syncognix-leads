@@ -1,5 +1,5 @@
 import type { BusinessSearchResult } from "@/types/business"
-import type { OverpassElement } from "./search-overpass"
+import type { OsmElement } from "./osm-element"
 import { hasNonUsAddress } from "./us-regions"
 
 /** Trims a tag value and collapses whitespace; empty values become null. */
@@ -55,7 +55,7 @@ function buildAddress(
   return [street, city, region].filter(Boolean).join(", ")
 }
 
-function coordinates(element: OverpassElement) {
+function coordinates(element: OsmElement) {
   const lat = element.type === "node" ? element.lat : element.center?.lat
   const lon = element.type === "node" ? element.lon : element.center?.lon
   if (typeof lat !== "number" || typeof lon !== "number") {
@@ -69,7 +69,7 @@ function coordinates(element: OverpassElement) {
  * unnamed objects and for anything whose address places it outside the US.
  */
 export function normalizeBusiness(
-  element: OverpassElement,
+  element: OsmElement,
   categoryId: string
 ): BusinessSearchResult | null {
   const tags = element.tags ?? {}

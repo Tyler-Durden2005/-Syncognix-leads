@@ -5,7 +5,7 @@ import { DEFAULT_SEARCH_RADIUS_METERS, OVERPASS_QUERY_TIMEOUT_S } from "./consta
 // category-map.ts can never produce a malformed or injectable query.
 const SAFE_TAG_PART = /^[a-z0-9_:]+$/
 
-function tagSelector({ key, value }: OsmTagFilter) {
+export function tagSelector({ key, value }: OsmTagFilter) {
   if (!SAFE_TAG_PART.test(key) || !SAFE_TAG_PART.test(value)) {
     throw new Error(`Invalid OSM tag in category map: ${key}=${value}`)
   }

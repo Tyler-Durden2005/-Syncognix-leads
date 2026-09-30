@@ -1,5 +1,7 @@
 export type OsmElementType = "node" | "way" | "relation"
 
+export type BusinessDataSource = "nominatim" | "overpass"
+
 /** A clean, normalized US business returned by the search API. */
 export interface BusinessSearchResult {
   /** Unique across element types, e.g. "node:123456". */
@@ -56,6 +58,12 @@ export interface BusinessSearchSuccessResponse {
     radiusMeters: number
     /** Matching businesses found before `limit` was applied. */
     resultsBeforeLimit: number
+    /** OpenStreetMap services that contributed results. */
+    sources: BusinessDataSource[]
+    /** True when served from the server's recent-results cache. */
+    cached: boolean
+    /** Set when results may be incomplete (e.g. a source was busy). */
+    notice?: string
   }
 }
 

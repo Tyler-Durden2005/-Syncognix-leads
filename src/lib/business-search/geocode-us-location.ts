@@ -1,31 +1,18 @@
 import "server-only"
 
 import type { UsLocation } from "@/types/business"
-import {
-  GEOCODE_CACHE_MAX_ENTRIES,
-  GEOCODE_CACHE_TTL_MS,
-  NOMINATIM_SEARCH_URL,
-  NOMINATIM_TIMEOUT_MS,
-} from "./constants"
-import {
-  BusinessSearchError,
-  fetchWithTimeout,
-  upstreamError,
-  upstreamStatusError,
-} from "./errors"
+import { GEOCODE_CACHE_MAX_ENTRIES, GEOCODE_CACHE_TTL_MS } from "./constants"
+import { BusinessSearchError, upstreamError } from "./errors"
+import { nominatimSearch } from "./nominatim-client"
+import { TtlCache } from "./ttl-cache"
 import { mentionsUnitedStates, US_ZIP_CODE } from "./us-regions"
-import { getOsmReferer, getOsmUserAgent } from "./user-agent"
 
 /*
- * Uses the public Nominatim instance, which is fine for development and V1
- * but has a strict usage policy (max ~1 request/second, no heavy use):
- * https://operations.osmfoundation.org/policies/nominatim/
- *
- * Each search makes at most one Nominatim request, never in a loop or in
- * parallel, and repeat locations are served from a small in-memory cache.
- * That cache lives per server process: before production-scale traffic,
- * move it to a shared store (e.g. a Supabase table) or switch to a
- * self-hosted/commercial geocoder. Only this file needs to change.
+ * Geocodes with the public Nominatim instance (fine for development and V1).
+ * Each search makes at most one geocoding request, and repeat locations are
+ * served from a 24-hour in-memory cache. Before production-scale traffic,
+ * move the cache to a shared store or switch to a self-hosted/commercial
+ * geocoder — only this file needs to change.
  */
 
 interface NominatimAddress {
@@ -34,10 +21,8 @@ interface NominatimAddress {
   village?: string
   hamlet?: string
   municipality?: string
-  county?: string
   state?: string
   postcode?: string
-  country?: string
   country_code?: string
 }
 
@@ -53,34 +38,7 @@ const NOT_FOUND_MESSAGE =
 const NOT_US_MESSAGE =
   "This version currently supports United States locations only."
 
-// --- In-memory cache -------------------------------------------------------
-
-const cache = new Map<string, { location: UsLocation; expiresAt: number }>()
-
-function cacheKey(location: string) {
-  return location.toLowerCase().replace(/\s+/g, " ").trim()
-}
-
-function readCache(key: string) {
-  const entry = cache.get(key)
-  if (!entry) return null
-  if (entry.expiresAt < Date.now()) {
-    cache.delete(key)
-    return null
-  }
-  return entry.location
-}
-
-function writeCache(key: string, location: UsLocation) {
-  // Map keeps insertion order, so the first key is the oldest entry.
-  if (cache.size >= GEOCODE_CACHE_MAX_ENTRIES) {
-    const oldest = cache.keys().next().value
-    if (oldest !== undefined) cache.delete(oldest)
-  }
-  cache.set(key, { location, expiresAt: Date.now() + GEOCODE_CACHE_TTL_MS })
-}
-
-// --- Geocoding -------------------------------------------------------------
+const cache = new TtlCache<UsLocation>(GEOCODE_CACHE_TTL_MS, GEOCODE_CACHE_MAX_ENTRIES)
 
 /**
  * Builds the Nominatim query. ZIP codes and inputs that name a US state are
@@ -117,36 +75,11 @@ function pickCity(address: NominatimAddress) {
 }
 
 export async function geocodeUsLocation(location: string): Promise<UsLocation> {
-  const key = cacheKey(location)
-  const cached = readCache(key)
+  const key = location.toLowerCase().replace(/\s+/g, " ").trim()
+  const cached = cache.get(key)
   if (cached) return cached
 
-  const headers: Record<string, string> = {
-    "User-Agent": getOsmUserAgent(),
-    Accept: "application/json",
-    "Accept-Language": "en",
-  }
-  const referer = getOsmReferer()
-  if (referer) headers.Referer = referer
-
-  const response = await fetchWithTimeout(
-    "nominatim",
-    `${NOMINATIM_SEARCH_URL}?${buildSearchParams(location)}`,
-    { headers },
-    NOMINATIM_TIMEOUT_MS
-  )
-
-  if (!response.ok) throw upstreamStatusError("nominatim", response.status)
-
-  let places: unknown
-  try {
-    places = JSON.parse(response.text)
-  } catch {
-    throw upstreamError("nominatim", "upstream_bad_response", "Response was not valid JSON")
-  }
-  if (!Array.isArray(places)) {
-    throw upstreamError("nominatim", "upstream_bad_response", "Expected a JSON array")
-  }
+  const places = await nominatimSearch(buildSearchParams(location))
 
   const place = places[0] as NominatimPlace | undefined
   if (!place) {
@@ -186,6 +119,6 @@ export async function geocodeUsLocation(location: string): Promise<UsLocation> {
     countryCode: "US",
   }
 
-  writeCache(key, result)
+  cache.set(key, result)
   return result
 }

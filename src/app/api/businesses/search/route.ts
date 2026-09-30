@@ -9,7 +9,7 @@ import { searchBusinesses } from "@/lib/business-search/search-businesses"
 import { validateSearchRequest } from "@/lib/business-search/validate-request"
 import type { BusinessSearchErrorResponse } from "@/types/business"
 
-// Geocoding (<=9s) + Overpass (<=45s across attempts) stays under this.
+// searchBusinesses caps itself at SEARCH_DEADLINE_MS (50s), under this limit.
 export const maxDuration = 60
 
 const NO_STORE = { "Cache-Control": "no-store" }
