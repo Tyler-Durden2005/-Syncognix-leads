@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import { AuthCard } from "@/components/auth/auth-card"
+import { brand } from "@/config/brand"
 import { AuthLink } from "@/components/auth/auth-link"
 import { LoginForm } from "@/components/auth/login-form"
 
@@ -17,7 +18,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   return (
     <AuthCard
       title="Welcome back"
-      description="Sign in to your BlackWolves Leads workspace."
+      description={`Sign in to your ${brand.name} workspace.`}
       footer={
         <>
           Don&apos;t have an account? <AuthLink href="/signup">Create one</AuthLink>

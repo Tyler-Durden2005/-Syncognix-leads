@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import { AppProviders } from "@/components/providers/app-providers"
 import { themeInitScript } from "@/lib/theme-config"
-import { siteConfig } from "@/config/site"
+import { brand } from "@/config/brand"
 import "./globals.css"
 
 const geistSans = Geist({
@@ -19,10 +19,22 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: siteConfig.name,
-    template: `%s · ${siteConfig.name}`,
+    default: brand.name,
+    template: `%s | ${brand.name}`,
   },
-  description: siteConfig.description,
+  description: brand.description,
+  applicationName: brand.name,
+  openGraph: {
+    type: "website",
+    siteName: brand.name,
+    title: brand.name,
+    description: brand.description,
+  },
+  twitter: {
+    card: "summary",
+    title: brand.name,
+    description: brand.description,
+  },
 }
 
 export const viewport: Viewport = {

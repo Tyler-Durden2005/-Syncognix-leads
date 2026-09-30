@@ -1,3 +1,5 @@
+import { brand } from "@/config/brand"
+
 /** Search radius around the geocoded location. */
 export const DEFAULT_SEARCH_RADIUS_METERS = 30_000
 
@@ -55,4 +57,4 @@ export const OVERPASS_TOTAL_BUDGET_MS = 45_000
 export const OVERPASS_MIN_ATTEMPT_MS = 10_000
 
 /** Default application identity sent to OpenStreetMap services. */
-export const DEFAULT_OSM_USER_AGENT = "BlackWolves-Leads/0.1"
+export const DEFAULT_OSM_USER_AGENT = `${brand.userAgentName}/0.1`

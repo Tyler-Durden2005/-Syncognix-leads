@@ -1,5 +1,6 @@
 import { AuthShowcase } from "@/components/auth/auth-showcase"
 import { Logo } from "@/components/brand/logo"
+import { brand } from "@/config/brand"
 
 export default function AuthLayout({ children }: LayoutProps<"/">) {
   return (
@@ -16,7 +17,7 @@ export default function AuthLayout({ children }: LayoutProps<"/">) {
           {children}
         </div>
         <footer className="px-6 pb-6 text-center text-xs text-muted-foreground lg:text-left">
-          © {new Date().getFullYear()} BlackWolves Leads
+          © {new Date().getFullYear()} {brand.name}
         </footer>
       </main>
     </div>

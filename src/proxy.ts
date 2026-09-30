@@ -8,8 +8,9 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Run on everything except static assets and image optimization files.
+     * Run on everything except static assets, image optimization files and
+     * the generated app icons (src/app/icon.tsx, apple-icon.tsx).
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt|xml)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icon$|apple-icon$|.*\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt|xml)$).*)",
   ],
 }

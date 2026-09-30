@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { Logo } from "@/components/brand/logo"
+import { brand } from "@/config/brand"
 import type { AppUser } from "@/types"
 import { SidebarNav } from "./sidebar-nav"
 import { UserMenu } from "./user-menu"
@@ -21,7 +22,7 @@ export function SidebarContent({ user, layoutId, onNavigate }: SidebarContentPro
           href="/dashboard"
           onClick={onNavigate}
           className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
-          aria-label="BlackWolves Leads home"
+          aria-label={`${brand.name} home`}
         >
           <Logo textClassName="text-sidebar-accent-foreground" />
         </Link>

@@ -1,7 +1,7 @@
 import { Mail, Search, Sparkles } from "lucide-react"
 import { Logo } from "@/components/brand/logo"
 import { FadeIn } from "@/components/shared/motion"
-import { siteConfig } from "@/config/site"
+import { brand } from "@/config/brand"
 
 const benefits = [
   {
@@ -46,7 +46,7 @@ export function AuthShowcase() {
         className="pointer-events-none absolute -top-40 left-1/2 h-80 w-[36rem] -translate-x-1/2 rounded-full bg-sidebar-primary/10 blur-3xl"
       />
 
-      <Logo textClassName="text-sidebar-accent-foreground" className="relative" />
+      <Logo size="lg" textClassName="text-sidebar-accent-foreground" className="relative" />
 
       <div className="relative mt-auto max-w-md">
         <FadeIn>
@@ -54,7 +54,7 @@ export function AuthShowcase() {
             Lead intelligence for teams that sell with precision.
           </h2>
           <p className="mt-3 text-[15px] leading-relaxed text-sidebar-muted">
-            {siteConfig.description}
+            {brand.tagline}
           </p>
         </FadeIn>
 

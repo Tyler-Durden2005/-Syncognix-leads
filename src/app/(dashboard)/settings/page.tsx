@@ -3,6 +3,7 @@ import { BadgeCheck, Bot, Send, type LucideIcon } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { FadeIn } from "@/components/shared/motion"
 import { PageHeader } from "@/components/shared/page-header"
+import { brand } from "@/config/brand"
 import { AppearanceSettings } from "@/components/settings/appearance-settings"
 import { ProfileForm } from "@/components/settings/profile-form"
 import { SettingsSection } from "@/components/settings/settings-section"
@@ -40,7 +41,7 @@ export default async function SettingsPage() {
         <SettingsSection
           id="profile"
           title="Profile"
-          description="How you appear across your BlackWolves Leads workspace."
+          description={`How you appear across your ${brand.name} workspace.`}
         >
           <ProfileForm user={user} />
         </SettingsSection>

@@ -1,4 +1,4 @@
--- BlackWolves Leads — Step 1: user profiles
+-- Syncognix Leads — Step 1: user profiles
 -- Run in Supabase Dashboard → SQL Editor, or with `supabase db push`.
 
 -- 1. Table ---------------------------------------------------------------

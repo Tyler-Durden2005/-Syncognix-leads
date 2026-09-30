@@ -1,40 +1,78 @@
+import { brand, brandMark } from "@/config/brand"
 import { cn } from "@/lib/utils"
-import { siteConfig } from "@/config/site"
 
-export function LogoMark({ className }: { className?: string }) {
+const SIZES = {
+  sm: { tile: "size-6 rounded-[5px]", text: "text-sm" },
+  md: { tile: "size-7 rounded-md", text: "text-[15px]" },
+  lg: { tile: "size-10 rounded-[9px]", text: "text-lg" },
+} as const
+
+type LogoSize = keyof typeof SIZES
+
+/**
+ * The SL monogram on a primary-colored tile. Decorative by default; pass
+ * `label` when it is shown without the brand name next to it.
+ */
+export function LogoMark({
+  size = "md",
+  label,
+  className,
+}: {
+  size?: LogoSize
+  label?: string
+  className?: string
+}) {
   return (
     <span
-      aria-hidden
+      {...(label ? { role: "img", "aria-label": label } : { "aria-hidden": true })}
       className={cn(
-        "grid size-7 shrink-0 place-items-center rounded-md bg-gradient-to-b from-primary to-[oklch(0.44_0.19_272)] text-primary-foreground shadow-xs ring-1 ring-white/10 ring-inset",
+        "grid shrink-0 place-items-center bg-primary text-primary-foreground ring-1 ring-black/5 ring-inset dark:ring-white/10",
+        SIZES[size].tile,
         className
       )}
     >
-      <svg viewBox="0 0 24 24" fill="none" className="size-4">
-        <path
-          d="M4 18V7.5l4.5 3.5L12 5l3.5 6L20 7.5V18l-4-2.5L12 19l-4-3.5L4 18Z"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinejoin="round"
-        />
+      <svg
+        viewBox={brandMark.viewBox}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={brandMark.strokeWidth}
+        strokeLinejoin="round"
+        className="size-full"
+      >
+        {brandMark.paths.map((d) => (
+          <path key={d} d={d} />
+        ))}
       </svg>
     </span>
   )
 }
 
+/**
+ * Brand lockup: [SL] Syncognix Leads. `compact` shows only the mark (with an
+ * accessible name), e.g. for collapsed sidebars.
+ */
 export function Logo({
+  compact = false,
+  size = "md",
   className,
   textClassName,
 }: {
+  compact?: boolean
+  size?: LogoSize
   className?: string
   textClassName?: string
 }) {
+  if (compact) return <LogoMark size={size} label={brand.name} className={className} />
+
+  const [company, ...rest] = brand.name.split(" ")
   return (
     <span className={cn("flex items-center gap-2.5", className)}>
-      <LogoMark />
-      <span className={cn("text-[15px] font-semibold tracking-tight", textClassName)}>
-        {siteConfig.shortName}
-        <span className="font-normal opacity-60"> Leads</span>
+      <LogoMark size={size} />
+      <span
+        className={cn("font-semibold tracking-tight whitespace-nowrap", SIZES[size].text, textClassName)}
+      >
+        {company}
+        {rest.length > 0 && <span className="font-normal opacity-60"> {rest.join(" ")}</span>}
       </span>
     </span>
   )
