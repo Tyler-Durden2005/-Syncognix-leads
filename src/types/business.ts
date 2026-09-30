@@ -65,7 +65,15 @@ export interface BusinessSearchSuccessResponse {
     /** Set when results may be incomplete (e.g. a source was busy). */
     notice?: string
   }
+  /** Whether the results were saved to the signed-in user's leads. */
+  leads: LeadsSaveStatus
 }
+
+export type LeadsSaveStatus =
+  | { status: "saved"; count: number }
+  | { status: "failed"; message: string }
+  /** No signed-in user (only possible in `next dev`), so nothing was saved. */
+  | { status: "skipped"; message: string }
 
 export interface BusinessSearchErrorResponse {
   success: false

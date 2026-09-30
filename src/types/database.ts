@@ -28,6 +28,64 @@ export type Database = {
         }
         Relationships: []
       }
+      leads: {
+        Row: {
+          id: string
+          user_id: string
+          osm_id: string
+          osm_type: "node" | "way" | "relation"
+          name: string
+          website: string | null
+          phone: string | null
+          street: string | null
+          city: string | null
+          state: string | null
+          postcode: string | null
+          address: string | null
+          category: string
+          latitude: number | null
+          longitude: number | null
+          search_business_type: string | null
+          search_location: string | null
+          status: LeadStatus
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string
+          osm_id: string
+          osm_type: "node" | "way" | "relation"
+          name: string
+          website?: string | null
+          phone?: string | null
+          street?: string | null
+          city?: string | null
+          state?: string | null
+          postcode?: string | null
+          address?: string | null
+          category: string
+          latitude?: number | null
+          longitude?: number | null
+          search_business_type?: string | null
+          search_location?: string | null
+          status?: LeadStatus
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          website?: string | null
+          phone?: string | null
+          street?: string | null
+          city?: string | null
+          state?: string | null
+          postcode?: string | null
+          address?: string | null
+          status?: LeadStatus
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>
@@ -36,4 +94,7 @@ export type Database = {
   }
 }
 
+export type LeadStatus = "new" | "contacted" | "replied" | "qualified" | "archived"
+
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"]
+export type Lead = Database["public"]["Tables"]["leads"]["Row"]

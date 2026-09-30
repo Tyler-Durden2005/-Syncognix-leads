@@ -1,30 +1,38 @@
 "use client"
 
 import { useState } from "react"
-import { Building2, Hash, MapPin, Search } from "lucide-react"
-import { toast } from "sonner"
-import { Badge } from "@/components/ui/badge"
+import { Building2, Hash, Loader2, MapPin, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { FormAlert } from "@/components/forms/form-alert"
 import { FormField, fieldA11y } from "@/components/forms/form-field"
 import { collectErrors } from "@/lib/validation"
 
-const MIN_LEADS = 10
-const MAX_LEADS = 500
+// Matches the search API's limits (src/lib/business-search/constants.ts).
+const MIN_LEADS = 1
+const MAX_LEADS = 100
+const DEFAULT_LEADS = 25
 
 type Errors = Partial<Record<"businessType" | "location" | "limit", string>>
 
-/**
- * Search form UI. Submitting validates input but does not run a search yet —
- * the search backend ships in Step 2.
- */
-export function LeadSearchForm() {
+export type LeadSearchValues = {
+  businessType: string
+  location: string
+  limit: number
+}
+
+/** Search criteria form. Validates input, then hands it to `onSearch`. */
+export function LeadSearchForm({
+  onSearch,
+  pending,
+}: {
+  onSearch: (values: LeadSearchValues) => void
+  pending: boolean
+}) {
   const [errors, setErrors] = useState<Errors>({})
-  const [notice, setNotice] = useState<string>()
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (pending) return
     const data = new FormData(event.currentTarget)
     const businessType = String(data.get("businessType") ?? "").trim()
     const location = String(data.get("location") ?? "").trim()
@@ -32,8 +40,10 @@ export function LeadSearchForm() {
 
     const nextErrors =
       collectErrors({
-        businessType: businessType ? undefined : "Enter a business type.",
-        location: location ? undefined : "Enter a location.",
+        businessType:
+          businessType.length >= 2 ? undefined : "Enter a business type, e.g. dentist.",
+        location:
+          location.length >= 2 ? undefined : "Enter a US city, state or ZIP code.",
         limit:
           Number.isInteger(limit) && limit >= MIN_LEADS && limit <= MAX_LEADS
             ? undefined
@@ -41,17 +51,9 @@ export function LeadSearchForm() {
       }) ?? {}
 
     setErrors(nextErrors)
-    if (Object.keys(nextErrors).length) {
-      setNotice(undefined)
-      return
-    }
+    if (Object.keys(nextErrors).length) return
 
-    setNotice(
-      `Ready to search for ${limit} “${businessType}” businesses in ${location}. Lead search is coming in Step 2.`
-    )
-    toast.info("Lead search is coming in Step 2", {
-      description: "Your search form is ready. Results will appear here once search launches.",
-    })
+    onSearch({ businessType, location, limit })
   }
 
   function clear(name: keyof Errors) {
@@ -65,16 +67,11 @@ export function LeadSearchForm() {
 
   return (
     <form onSubmit={onSubmit} noValidate className="rounded-lg border bg-card shadow-xs">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b px-5 py-4">
-        <div>
-          <h2 className="text-sm font-medium">Search criteria</h2>
-          <p className="text-[13px] text-muted-foreground">
-            Describe the businesses you want to reach.
-          </p>
-        </div>
-        <Badge variant="secondary" className="font-normal">
-          Coming in Step 2
-        </Badge>
+      <div className="border-b px-5 py-4">
+        <h2 className="text-sm font-medium">Search criteria</h2>
+        <p className="text-[13px] text-muted-foreground">
+          Describe the businesses you want to reach. United States locations only.
+        </p>
       </div>
 
       <div className="grid gap-5 p-5 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_10rem]">
@@ -83,8 +80,9 @@ export function LeadSearchForm() {
             <Input
               {...fieldA11y("businessType", errors.businessType)}
               name="businessType"
-              placeholder="e.g. Mobile Detailing"
+              placeholder="e.g. Dentist"
               autoComplete="off"
+              disabled={pending}
               onChange={() => clear("businessType")}
               className="h-10 pl-9"
             />
@@ -96,8 +94,9 @@ export function LeadSearchForm() {
             <Input
               {...fieldA11y("location", errors.location)}
               name="location"
-              placeholder="e.g. Florida"
+              placeholder="e.g. Orlando, Florida or 32801"
               autoComplete="off"
+              disabled={pending}
               onChange={() => clear("location")}
               className="h-10 pl-9"
             />
@@ -113,8 +112,8 @@ export function LeadSearchForm() {
               inputMode="numeric"
               min={MIN_LEADS}
               max={MAX_LEADS}
-              step={10}
-              defaultValue={100}
+              defaultValue={DEFAULT_LEADS}
+              disabled={pending}
               onChange={() => clear("limit")}
               className="h-10 pl-9 tabular-nums"
             />
@@ -122,16 +121,14 @@ export function LeadSearchForm() {
         </FormField>
       </div>
 
-      <div className="px-5">
-        <FormAlert variant="success" message={notice} className="mb-5 border-primary/20 bg-primary/5 text-primary" />
-      </div>
-
       <div className="flex flex-col-reverse gap-3 border-t bg-muted/30 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-xs text-muted-foreground">
-          Results include website, email, and an opportunity score for each business.
+          Try plumber, dentist, restaurant, car wash, car repair, electrician, roofing,
+          landscaping, cleaning, HVAC or auto detailing.
         </p>
-        <Button type="submit" className="h-10 sm:h-9">
-          <Search /> Find Leads
+        <Button type="submit" disabled={pending} className="h-10 shrink-0 sm:h-9">
+          {pending ? <Loader2 className="animate-spin" aria-hidden /> : <Search />}
+          {pending ? "Searching…" : "Find Leads"}
         </Button>
       </div>
     </form>

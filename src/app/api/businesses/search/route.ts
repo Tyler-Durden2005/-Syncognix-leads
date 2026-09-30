@@ -7,7 +7,12 @@ import {
 import { getSupportedCategoryIds } from "@/lib/business-search/normalize-category"
 import { searchBusinesses } from "@/lib/business-search/search-businesses"
 import { validateSearchRequest } from "@/lib/business-search/validate-request"
-import type { BusinessSearchErrorResponse } from "@/types/business"
+import { saveLeads } from "@/lib/leads/save-leads"
+import type {
+  BusinessSearchErrorResponse,
+  BusinessSearchSuccessResponse,
+  LeadsSaveStatus,
+} from "@/types/business"
 
 // searchBusinesses caps itself at SEARCH_DEADLINE_MS (50s), under this limit.
 export const maxDuration = 60
@@ -23,30 +28,34 @@ function errorResponse(error: BusinessSearchError) {
 }
 
 /**
- * Signed-in users only. In `next dev` the check is skipped so the endpoint
- * can be exercised with curl/Postman without a session cookie.
+ * Returns the signed-in user's id, or null. Signed-in users only — except in
+ * `next dev`, where anonymous requests are allowed so the endpoint can be
+ * exercised with curl/Postman (their results just aren't saved).
  */
-async function isAuthorized() {
-  if (process.env.NODE_ENV === "development") return true
+async function getRequestUser() {
+  const supabase = await createClient()
+  let userId: string | null = null
   try {
-    const supabase = await createClient()
     const { data } = await supabase.auth.getClaims()
-    return Boolean(data?.claims?.sub)
+    userId = data?.claims?.sub ?? null
   } catch {
-    return false
+    userId = null
   }
+
+  if (!userId && process.env.NODE_ENV !== "development") {
+    throw new BusinessSearchError({
+      message: "You need to be signed in to search for businesses.",
+      status: 401,
+      code: "unauthorized",
+      service: "request",
+    })
+  }
+  return { supabase, userId }
 }
 
 export async function POST(request: Request) {
   try {
-    if (!(await isAuthorized())) {
-      throw new BusinessSearchError({
-        message: "You need to be signed in to search for businesses.",
-        status: 401,
-        code: "unauthorized",
-        service: "request",
-      })
-    }
+    const { supabase, userId } = await getRequestUser()
 
     let body: unknown
     try {
@@ -62,7 +71,14 @@ export async function POST(request: Request) {
 
     const query = validateSearchRequest(body)
     const result = await searchBusinesses(query)
-    return Response.json(result, { headers: NO_STORE })
+
+    // Saving never hides results: a failed save is reported alongside them.
+    const leads: LeadsSaveStatus = userId
+      ? await saveLeads(supabase, userId, query, result.businesses)
+      : { status: "skipped", message: "Sign in to save results to your Leads." }
+
+    const response: BusinessSearchSuccessResponse = { ...result, leads }
+    return Response.json(response, { headers: NO_STORE })
   } catch (error) {
     logBusinessSearchError(error)
     if (isBusinessSearchError(error)) return errorResponse(error)
