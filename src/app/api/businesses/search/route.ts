@@ -4,12 +4,12 @@ import {
   isBusinessSearchError,
   logBusinessSearchError,
 } from "@/lib/business-search/errors"
-import { getSupportedCategoryIds } from "@/lib/business-search/category-map"
+import { getSupportedCategoryIds } from "@/lib/business-search/normalize-category"
 import { searchBusinesses } from "@/lib/business-search/search-businesses"
 import { validateSearchRequest } from "@/lib/business-search/validate-request"
 import type { BusinessSearchErrorResponse } from "@/types/business"
 
-// Geocoding + Overpass can together take up to ~40s in the worst case.
+// Geocoding (<=9s) + Overpass (<=45s across attempts) stays under this.
 export const maxDuration = 60
 
 const NO_STORE = { "Cache-Control": "no-store" }

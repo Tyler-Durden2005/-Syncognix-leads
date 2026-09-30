@@ -4,6 +4,7 @@ export type BusinessSearchErrorCode =
   | "invalid_request"
   | "unsupported_category"
   | "location_not_found"
+  | "location_not_us"
   | "upstream_timeout"
   | "upstream_busy"
   | "upstream_rate_limited"
@@ -42,6 +43,22 @@ export function isBusinessSearchError(error: unknown): error is BusinessSearchEr
   return error instanceof BusinessSearchError
 }
 
+type UpstreamService = "nominatim" | "overpass"
+
+const MESSAGES: Record<UpstreamService, { timeout: string; unavailable: string }> = {
+  nominatim: {
+    timeout: "Location lookup timed out. Please try again.",
+    unavailable: "Location lookup is temporarily unavailable. Please try again.",
+  },
+  overpass: {
+    timeout: "Business search timed out. Please try again.",
+    unavailable: "Business search is temporarily unavailable. Please try again.",
+  },
+}
+
+const RATE_LIMITED_MESSAGE =
+  "Too many searches right now. Please wait a minute and try again."
+
 function isAbortError(error: unknown) {
   return (
     error instanceof Error &&
@@ -49,80 +66,73 @@ function isAbortError(error: unknown) {
   )
 }
 
-const SERVICE_LABELS = {
-  nominatim: "location service",
-  overpass: "business directory",
-} as const
+export function upstreamError(
+  service: UpstreamService,
+  code: "upstream_timeout" | "upstream_busy" | "upstream_unavailable" | "upstream_bad_response",
+  detail: string
+) {
+  return new BusinessSearchError({
+    message: code === "upstream_timeout" ? MESSAGES[service].timeout : MESSAGES[service].unavailable,
+    status: code === "upstream_timeout" ? 504 : 502,
+    code,
+    service,
+    detail,
+  })
+}
+
+export interface UpstreamResponse {
+  ok: boolean
+  status: number
+  /** Full response body; read inside the timeout window. */
+  text: string
+}
 
 /**
- * Runs `fetch` with a hard timeout and converts timeouts and network failures
- * into user-safe BusinessSearchErrors.
+ * Runs `fetch` and reads the whole body under one hard timeout
+ * (AbortController), so a slow download can't outlive the deadline.
+ * Timeouts and network failures become user-safe BusinessSearchErrors.
  */
 export async function fetchWithTimeout(
-  service: keyof typeof SERVICE_LABELS,
+  service: UpstreamService,
   url: string,
   init: RequestInit,
   timeoutMs: number
-): Promise<Response> {
+): Promise<UpstreamResponse> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
-  const label = SERVICE_LABELS[service]
 
   try {
-    return await fetch(url, { ...init, signal: controller.signal, cache: "no-store" })
+    const response = await fetch(url, { ...init, signal: controller.signal, cache: "no-store" })
+    const text = await response.text()
+    return { ok: response.ok, status: response.status, text }
   } catch (error) {
     if (isAbortError(error)) {
-      throw new BusinessSearchError({
-        message: `The ${label} took too long to respond. Please try again.`,
-        status: 504,
-        code: "upstream_timeout",
-        service,
-        detail: `Timed out after ${timeoutMs}ms`,
-      })
+      throw upstreamError(service, "upstream_timeout", `Timed out after ${timeoutMs}ms`)
     }
-    throw new BusinessSearchError({
-      message: `We couldn't reach the ${label}. Please try again in a moment.`,
-      status: 502,
-      code: "upstream_unavailable",
+    throw upstreamError(
       service,
-      detail: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
-    })
+      "upstream_unavailable",
+      error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+    )
   } finally {
     clearTimeout(timer)
   }
 }
 
 /** Maps a non-OK upstream HTTP status to a user-safe error. */
-export function upstreamStatusError(
-  service: keyof typeof SERVICE_LABELS,
-  status: number
-): BusinessSearchError {
-  const label = SERVICE_LABELS[service]
+export function upstreamStatusError(service: UpstreamService, status: number) {
   if (status === 429) {
     return new BusinessSearchError({
-      message: `The ${label} is receiving too many requests. Please wait a minute and try again.`,
+      message: RATE_LIMITED_MESSAGE,
       status: 429,
       code: "upstream_rate_limited",
       service,
       detail: `HTTP ${status}`,
     })
   }
-  if (status === 503 || status === 504) {
-    return new BusinessSearchError({
-      message: `The ${label} is busy right now. Please try again in a moment.`,
-      status: 503,
-      code: "upstream_busy",
-      service,
-      detail: `HTTP ${status}`,
-    })
-  }
-  return new BusinessSearchError({
-    message: `The ${label} is temporarily unavailable. Please try again later.`,
-    status: 502,
-    code: "upstream_unavailable",
-    service,
-    detail: `HTTP ${status}`,
-  })
+  // Overpass answers 503/504 when it has no free query slots.
+  const code = status === 503 || status === 504 ? "upstream_busy" : "upstream_unavailable"
+  return upstreamError(service, code, `HTTP ${status}`)
 }
 
 /** Logs an error without request bodies, tokens or large upstream payloads. */
