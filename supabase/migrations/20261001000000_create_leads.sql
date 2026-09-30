@@ -1,5 +1,5 @@
 -- Syncognix Leads — Step 2: saved leads
--- Run in Supabase Dashboard → SQL Editor, or with `supabase db push`.
+-- Run in Supabase Dashboard → SQL Editor, or with `supabase db push`
 
 -- 1. Table ---------------------------------------------------------------
 create table if not exists public.leads (

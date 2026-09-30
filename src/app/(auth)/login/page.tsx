@@ -2,12 +2,14 @@ import type { Metadata } from "next"
 import { AuthCard } from "@/components/auth/auth-card"
 import { brand } from "@/config/brand"
 import { AuthLink } from "@/components/auth/auth-link"
+import { GitHubButton } from "@/components/auth/github-button"
 import { LoginForm } from "@/components/auth/login-form"
 
 export const metadata: Metadata = { title: "Sign in" }
 
 const NOTICES: Record<string, string> = {
   link_invalid: "That link is invalid or has expired. Please try again.",
+  oauth_failed: "GitHub sign-in didn't go through. Please try again.",
 }
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
@@ -25,6 +27,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
         </>
       }
     >
+      <GitHubButton next={next} />
       <LoginForm next={next} notice={error ? NOTICES[error] : undefined} />
     </AuthCard>
   )

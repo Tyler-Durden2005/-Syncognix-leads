@@ -190,3 +190,23 @@ export async function signOut() {
   revalidatePath("/", "layout")
   redirect("/login")
 }
+
+export async function signInWithGitHub(formData: FormData) {
+  const next = safeNextPath(field(formData, "next"))
+  let url: string | undefined
+
+  try {
+    const supabase = await createClient()
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: "github",
+      options: {
+        redirectTo: `${await getOrigin()}/auth/confirm?next=${encodeURIComponent(next)}`,
+      },
+    })
+    if (!error) url = data.url
+  } catch {
+    // Handled by the redirect below.
+  }
+
+  redirect(url ?? "/login?error=oauth_failed")
+}
