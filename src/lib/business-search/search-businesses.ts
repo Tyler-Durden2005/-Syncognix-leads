@@ -5,15 +5,19 @@ import type {
   BusinessSearchResult,
   BusinessSearchSuccessResponse,
 } from "@/types/business"
-import { resolveBusinessCategory } from "./category-map"
+import { buildOverpassQuery } from "./build-overpass-query"
+import { DATA_PROVIDER, DEFAULT_SEARCH_RADIUS_METERS } from "./constants"
+import { deduplicateBusinesses } from "./deduplicate-businesses"
 import { BusinessSearchError } from "./errors"
-import { geocodeLocation } from "./geocode-location"
-import { dedupeBusinesses, normalizeBusiness, sortByDistance } from "./normalize-business"
+import { geocodeUsLocation } from "./geocode-us-location"
+import { normalizeBusiness } from "./normalize-business"
+import { resolveBusinessCategory } from "./normalize-category"
+import { rankBusinesses } from "./rank-businesses"
 import { searchOverpass } from "./search-overpass"
 
 /**
- * Full search pipeline: category → geocode → Overpass → normalize → sort →
- * dedupe → limit. Upstream calls run strictly one after the other.
+ * Full search pipeline: category → US geocode → Overpass → normalize and
+ * US-filter → rank → dedupe → limit. Upstream calls run one after the other.
  */
 export async function searchBusinesses(
   query: BusinessSearchQuery
@@ -23,28 +27,37 @@ export async function searchBusinesses(
   if (!category) {
     throw new BusinessSearchError({
       message: "This business category is not supported yet.",
-      status: 400,
+      status: 422,
       code: "unsupported_category",
       service: "request",
     })
   }
 
-  const location = await geocodeLocation(query.location)
-  const elements = await searchOverpass(category, location.latitude, location.longitude)
+  const radiusMeters = DEFAULT_SEARCH_RADIUS_METERS
+  const searchLocation = await geocodeUsLocation(query.location)
+  const elements = await searchOverpass(
+    buildOverpassQuery(category, searchLocation.latitude, searchLocation.longitude, radiusMeters)
+  )
 
   const normalized = elements
     .map((element) => normalizeBusiness(element, category.id))
     .filter((business): business is BusinessSearchResult => business !== null)
 
-  const businesses = dedupeBusinesses(
-    sortByDistance(normalized, location.latitude, location.longitude)
-  ).slice(0, query.limit)
+  const ranked = deduplicateBusinesses(
+    rankBusinesses(normalized, searchLocation.latitude, searchLocation.longitude)
+  )
+  const businesses = ranked.slice(0, query.limit)
 
   return {
     success: true,
-    query,
-    location,
+    query: { ...query, normalizedBusinessType: category.id },
+    searchLocation,
     count: businesses.length,
     businesses,
+    meta: {
+      provider: DATA_PROVIDER,
+      radiusMeters,
+      resultsBeforeLimit: ranked.length,
+    },
   }
 }

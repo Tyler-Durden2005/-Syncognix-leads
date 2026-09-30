@@ -30,7 +30,7 @@ export const BUSINESS_CATEGORIES: readonly BusinessCategory[] = [
   {
     id: "dentist",
     label: "Dentist",
-    aliases: ["dentists", "dental", "dental clinic"],
+    aliases: ["dentists", "dental", "dental clinic", "dental office"],
     tags: [{ key: "amenity", value: "dentist" }],
   },
   {
@@ -48,28 +48,52 @@ export const BUSINESS_CATEGORIES: readonly BusinessCategory[] = [
   {
     id: "car repair",
     label: "Car repair",
-    aliases: ["auto repair", "car mechanic", "auto mechanic", "mechanic", "mechanics"],
+    aliases: ["auto repair", "car mechanic", "auto mechanic", "mechanic", "mechanics", "auto shop"],
     tags: [{ key: "shop", value: "car_repair" }],
   },
+  {
+    id: "electrician",
+    label: "Electrician",
+    aliases: ["electricians", "electrical contractor", "electrical contractors"],
+    tags: [{ key: "craft", value: "electrician" }],
+  },
+  {
+    id: "roofing",
+    label: "Roofing",
+    aliases: ["roofer", "roofers", "roofing contractor", "roofing contractors", "roofing company"],
+    tags: [{ key: "craft", value: "roofer" }],
+  },
+  {
+    id: "landscaping",
+    label: "Landscaping",
+    aliases: ["landscaper", "landscapers", "landscaping company", "lawn care"],
+    // Many US landscapers are tagged craft=gardener rather than craft=landscaper.
+    tags: [
+      { key: "craft", value: "landscaper" },
+      { key: "craft", value: "gardener" },
+    ],
+  },
+  {
+    id: "cleaning",
+    label: "Cleaning",
+    aliases: ["cleaner", "cleaners", "cleaning service", "cleaning services", "cleaning company", "janitorial"],
+    tags: [{ key: "craft", value: "cleaning" }],
+  },
+  {
+    id: "hvac",
+    label: "HVAC",
+    aliases: ["hvac contractor", "hvac contractors", "heating and cooling", "air conditioning", "ac repair"],
+    tags: [{ key: "craft", value: "hvac" }],
+  },
+  {
+    // OSM has no universal "detailing" tag, so this starts from the closest
+    // related places. Refine the tags here once better data sources exist.
+    id: "auto detailing",
+    label: "Auto detailing",
+    aliases: ["car detailing", "mobile detailing", "detailing", "auto detailer", "car detailer", "detailer"],
+    tags: [
+      { key: "amenity", value: "car_wash" },
+      { key: "shop", value: "car_repair" },
+    ],
+  },
 ]
-
-/** Lowercases, turns -/_ into spaces and collapses whitespace. */
-function normalizeCategoryInput(value: string) {
-  return value.toLowerCase().replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim()
-}
-
-const CATEGORY_LOOKUP = new Map<string, BusinessCategory>()
-for (const category of BUSINESS_CATEGORIES) {
-  for (const phrase of [category.id, ...category.aliases]) {
-    CATEGORY_LOOKUP.set(normalizeCategoryInput(phrase), category)
-  }
-}
-
-/** Returns the category for a user-supplied business type, or null if unsupported. */
-export function resolveBusinessCategory(input: string): BusinessCategory | null {
-  return CATEGORY_LOOKUP.get(normalizeCategoryInput(input)) ?? null
-}
-
-export function getSupportedCategoryIds() {
-  return BUSINESS_CATEGORIES.map((category) => category.id)
-}
