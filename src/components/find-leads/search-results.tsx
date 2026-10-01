@@ -1,70 +1,51 @@
 "use client"
 
-import Link from "next/link"
-import { CircleAlert, CircleCheck, Info, Radar, SearchX, TriangleAlert } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
+import { useEffect, useState } from "react"
+import { CircleAlert, Loader2, Radar } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import { LocationText, PhoneLink, WebsiteLink } from "@/components/leads/business-cells"
 import { EmptyState } from "@/components/shared/empty-state"
-import { cn } from "@/lib/utils"
-import type { BusinessSearchSuccessResponse } from "@/types/business"
+import { lowerFirst } from "@/lib/format"
+import type {
+  BusinessSearchResult,
+  BusinessSearchSuccessResponse,
+  CategoryOption,
+} from "@/types/business"
+import { ResultsView } from "./results-view"
 
 export type SearchState =
   | { status: "idle" }
-  | { status: "loading"; businessType: string; location: string }
+  | { status: "loading"; label: string; location: string; startedAt: number }
   | { status: "error"; message: string }
-  | { status: "success"; data: BusinessSearchSuccessResponse }
-
-const COLUMNS = ["Business", "Website", "Phone", "Address"]
+  | { status: "success"; data: BusinessSearchSuccessResponse; id: number }
 
 export function SearchResults({
   state,
+  categories,
+  savedIds,
+  onSave,
   onRetry,
 }: {
   state: SearchState
+  categories: CategoryOption[]
+  savedIds: ReadonlySet<string>
+  onSave: (businesses: BusinessSearchResult[]) => Promise<boolean>
   onRetry: () => void
 }) {
-  const count = state.status === "success" ? state.data.count : 0
-
   return (
     <section
-      aria-labelledby="results-heading"
+      aria-label="Search results"
       aria-busy={state.status === "loading"}
       className="overflow-hidden rounded-lg border bg-card shadow-xs"
     >
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b px-5 py-4">
-        <div className="min-w-0">
-          <h2 id="results-heading" className="text-sm font-medium">
-            Results
-          </h2>
-          {state.status === "success" && (
-            <p className="truncate text-xs text-muted-foreground">
-              Near {state.data.searchLocation.displayName}
-            </p>
-          )}
-        </div>
-        <span className="text-xs text-muted-foreground tabular-nums">
-          {count} {count === 1 ? "business" : "businesses"}
-        </span>
-      </div>
-
       {state.status === "idle" && <IdleState />}
       {state.status === "loading" && <LoadingState state={state} />}
       {state.status === "error" && (
         <EmptyState
           icon={CircleAlert}
-          title="Search failed"
+          title="Search didn't complete"
           description={state.message}
-          className="py-16 [&_h3]:text-destructive"
+          className="py-16"
           action={
             <Button variant="outline" size="sm" onClick={onRetry}>
               Try again
@@ -72,7 +53,16 @@ export function SearchResults({
           }
         />
       )}
-      {state.status === "success" && <ResultsTable data={state.data} />}
+      {state.status === "success" && (
+        // Keyed by search so filters and selection reset for each new search.
+        <ResultsView
+          key={state.id}
+          data={state.data}
+          categories={categories}
+          savedIds={savedIds}
+          onSave={onSave}
+        />
+      )}
     </section>
   )
 }
@@ -84,7 +74,7 @@ function IdleState() {
       <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 space-y-px opacity-60 [mask-image:linear-gradient(to_bottom,black,transparent_85%)]">
         {Array.from({ length: 5 }).map((_, i) => (
           <div key={i} className="flex items-center gap-4 border-b border-dashed px-5 py-4">
-            <span className="size-8 rounded-md bg-muted" />
+            <span className="size-4 rounded bg-muted" />
             <span className="h-2.5 w-40 rounded-full bg-muted" />
             <span className="ml-auto hidden h-2.5 w-24 rounded-full bg-muted sm:block" />
             <span className="hidden h-2.5 w-16 rounded-full bg-muted md:block" />
@@ -101,138 +91,62 @@ function IdleState() {
   )
 }
 
+/** Honest progress copy: what we're doing, never what we've "found". */
+const STAGES = [
+  { after: 0, text: "Locating the area…" },
+  { after: 1_500, text: "Searching OpenStreetMap business data…" },
+  { after: 9_000, text: "Still searching OpenStreetMap for more businesses…" },
+  { after: 25_000, text: "Still searching. Busy areas can take up to a minute." },
+]
+
 function LoadingState({ state }: { state: Extract<SearchState, { status: "loading" }> }) {
+  const [elapsed, setElapsed] = useState(0)
+
+  useEffect(() => {
+    const timer = setInterval(() => setElapsed(Date.now() - state.startedAt), 500)
+    return () => clearInterval(timer)
+  }, [state.startedAt])
+
+  const stage = [...STAGES].reverse().find((s) => elapsed >= s.after) ?? STAGES[0]
+
   return (
     <div>
-      <p role="status" className="border-b px-5 py-3 text-sm text-muted-foreground">
-        Searching for <span className="font-medium text-foreground">{state.businessType}</span> near{" "}
-        <span className="font-medium text-foreground">{state.location}</span>… Most searches take a
-        few seconds; some trades can take up to a minute.
-      </p>
+      <div className="border-b px-5 py-4">
+        <div className="flex items-start gap-3">
+          <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin text-primary" aria-hidden />
+          <div className="min-w-0" role="status" aria-live="polite">
+            <p className="text-sm font-medium">
+              Searching {lowerFirst(state.label)} in {state.location}…
+            </p>
+            <p
+              key={stage.text}
+              className="mt-0.5 animate-in text-[13px] text-muted-foreground duration-300 fade-in"
+            >
+              {stage.text}
+            </p>
+          </div>
+        </div>
+        {/* Indeterminate progress track */}
+        <div className="relative mt-4 h-1 overflow-hidden rounded-full bg-muted" aria-hidden>
+          <div className="absolute inset-y-0 w-1/3 animate-[search-progress_1.4s_ease-in-out_infinite] rounded-full motion-reduce:animate-none bg-primary/70" />
+        </div>
+      </div>
       {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="flex items-center gap-4 border-b px-5 py-4 last:border-b-0">
-          <Skeleton className="h-3 w-44" />
+        <div
+          key={i}
+          className="flex items-center gap-4 border-b px-5 py-4 last:border-b-0"
+          style={{ opacity: 1 - i * 0.13 }}
+        >
+          <Skeleton className="size-4 rounded" />
+          <div className="space-y-1.5">
+            <Skeleton className="h-3 w-44" />
+            <Skeleton className="h-2.5 w-24" />
+          </div>
           <Skeleton className="ml-auto hidden h-3 w-32 sm:block" />
           <Skeleton className="hidden h-3 w-28 md:block" />
           <Skeleton className="hidden h-3 w-48 lg:block" />
         </div>
       ))}
-    </div>
-  )
-}
-
-function Banner({
-  tone,
-  icon: Icon,
-  children,
-}: {
-  tone: "success" | "warning" | "error" | "muted"
-  icon: React.ComponentType<{ className?: string }>
-  children: React.ReactNode
-}) {
-  return (
-    <div
-      role={tone === "error" ? "alert" : "status"}
-      className={cn(
-        "flex items-start gap-2.5 border-b px-5 py-3 text-sm",
-        tone === "success" && "bg-success/8 text-success",
-        tone === "warning" && "bg-warning/10 text-foreground [&_svg]:text-warning",
-        tone === "error" && "bg-destructive/5 text-destructive",
-        tone === "muted" && "bg-muted/40 text-muted-foreground"
-      )}
-    >
-      <Icon className="mt-0.5 size-4 shrink-0" aria-hidden />
-      <div className="leading-snug">{children}</div>
-    </div>
-  )
-}
-
-function ResultsTable({ data }: { data: BusinessSearchSuccessResponse }) {
-  const { businesses, leads, meta } = data
-
-  return (
-    <div>
-      {leads.status === "saved" && leads.count > 0 && (
-        <Banner tone="success" icon={CircleCheck}>
-          Saved {leads.count} {leads.count === 1 ? "lead" : "leads"} to your list.{" "}
-          <Link href="/leads" className="font-medium underline underline-offset-4">
-            View Leads
-          </Link>
-        </Banner>
-      )}
-      {leads.status === "failed" && (
-        <Banner tone="error" icon={CircleAlert}>
-          {leads.message}
-        </Banner>
-      )}
-      {leads.status === "skipped" && (
-        <Banner tone="muted" icon={Info}>
-          {leads.message}
-        </Banner>
-      )}
-      {meta.notice && (
-        <Banner tone="warning" icon={TriangleAlert}>
-          {meta.notice}
-        </Banner>
-      )}
-
-      {businesses.length === 0 ? (
-        <EmptyState
-          icon={SearchX}
-          title="No businesses found."
-          description="OpenStreetMap has no matching businesses within 30 km. Try a nearby larger city or a related category."
-          className="py-16"
-        />
-      ) : (
-        <Table>
-          <TableHeader className="bg-muted/40">
-            <TableRow className="hover:bg-transparent">
-              {COLUMNS.map((column) => (
-                <TableHead
-                  key={column}
-                  className="h-10 px-4 text-xs font-medium whitespace-nowrap text-muted-foreground first:pl-5 last:pr-5"
-                >
-                  {column}
-                </TableHead>
-              ))}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {businesses.map((business) => (
-              <TableRow key={business.osmId}>
-                <TableCell className="px-4 py-3 pl-5 align-top">
-                  <div className="min-w-44 font-medium text-foreground">{business.name}</div>
-                  <Badge variant="secondary" className="mt-1 font-normal capitalize">
-                    {business.category}
-                  </Badge>
-                </TableCell>
-                <TableCell className="px-4 py-3 align-top">
-                  <WebsiteLink url={business.website} />
-                </TableCell>
-                <TableCell className="px-4 py-3 align-top">
-                  <PhoneLink phone={business.phone} />
-                </TableCell>
-                <TableCell className="px-4 py-3 pr-5 align-top whitespace-normal">
-                  <LocationText
-                    address={business.address}
-                    city={business.city}
-                    state={business.state}
-                  />
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
-
-      {businesses.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t px-5 py-3 text-xs text-muted-foreground">
-          <span className="tabular-nums">
-            Showing {businesses.length} of {meta.resultsBeforeLimit} found
-          </span>
-          <span>Data © OpenStreetMap contributors</span>
-        </div>
-      )}
     </div>
   )
 }

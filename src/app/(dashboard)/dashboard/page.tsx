@@ -11,18 +11,32 @@ import { Stagger, StaggerItem } from "@/components/shared/motion"
 import { PageHeader } from "@/components/shared/page-header"
 import { ToastOnMount } from "@/components/shared/toast-on-mount"
 import { requireUser } from "@/lib/auth/user"
+import { getLeadCount } from "@/lib/leads/get-leads"
+import { getRecentSearches } from "@/lib/leads/searches"
 
 export const metadata: Metadata = { title: "Dashboard" }
 
-const metrics = [
-  { title: "Total Leads", value: 0, icon: Building2 },
-  { title: "Emails Found", value: 0, icon: MailSearch },
-  { title: "Verified Emails", value: 0, icon: BadgeCheck },
-  { title: "High Quality Leads", value: 0, icon: Sparkles },
-]
+// Email discovery, verification and scoring arrive in later steps.
+const LATER = "Not analyzed yet"
 
 export default async function DashboardPage({ searchParams }: PageProps<"/dashboard">) {
   const [user, params] = await Promise.all([requireUser(), searchParams])
+  const [leadCount, recentSearches] = await Promise.all([
+    getLeadCount(user.id),
+    getRecentSearches(user.id),
+  ])
+
+  const metrics = [
+    {
+      title: "Total Leads",
+      value: leadCount ?? 0,
+      icon: Building2,
+      hint: leadCount ? "Saved from your searches" : "No saved leads yet",
+    },
+    { title: "Emails Found", value: 0, icon: MailSearch, hint: LATER },
+    { title: "Verified Emails", value: 0, icon: BadgeCheck, hint: LATER },
+    { title: "High Quality Leads", value: 0, icon: Sparkles, hint: LATER },
+  ]
 
   return (
     <div className="space-y-8">
@@ -50,10 +64,10 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
 
       <Stagger className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <StaggerItem className="lg:col-span-2">
-          <RecentSearches />
+          <RecentSearches searches={recentSearches} />
         </StaggerItem>
         <StaggerItem>
-          <GettingStarted />
+          <GettingStarted hasSearched={recentSearches.length > 0 || Boolean(leadCount)} />
         </StaggerItem>
         <StaggerItem className="lg:col-span-2">
           <LeadQualityOverview />

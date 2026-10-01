@@ -1,56 +1,70 @@
 "use client"
 
-import { ArrowUpDown, Download, ListFilter, Search } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { useEffect, useRef, useState, useTransition } from "react"
+import { usePathname, useRouter } from "next/navigation"
+import { Loader2, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
-/** Toolbar controls are visible but inactive until leads exist (Step 2+). */
-export function LeadsToolbar() {
+const DEBOUNCE_MS = 300
+
+/** Searches saved leads by name, city, state or category via the `?q=` param. */
+export function LeadsToolbar({ query, total }: { query: string; total: number | null }) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const [value, setValue] = useState(query)
+  const [pending, startTransition] = useTransition()
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
+
+  // Follow outside URL changes (e.g. "Clear search") without fighting typing.
+  const [prevQuery, setPrevQuery] = useState(query)
+  if (query !== prevQuery) {
+    setPrevQuery(query)
+    if (query !== value.trim()) setValue(query)
+  }
+
+  useEffect(() => () => clearTimeout(timer.current), [])
+
+  function navigate(next: string) {
+    const term = next.trim()
+    // A new search always starts from the first page.
+    const href = term ? `${pathname}?q=${encodeURIComponent(term)}` : pathname
+    startTransition(() => router.replace(href, { scroll: false }))
+  }
+
+  function onChange(next: string) {
+    setValue(next)
+    clearTimeout(timer.current)
+    timer.current = setTimeout(() => navigate(next), DEBOUNCE_MS)
+  }
+
   return (
     <div className="flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
       <div className="relative w-full sm:max-w-xs">
-        <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+        {pending ? (
+          <Loader2 className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 animate-spin text-muted-foreground" aria-hidden />
+        ) : (
+          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+        )}
         <Input
           type="search"
-          placeholder="Search leads…"
-          aria-label="Search leads"
-          disabled
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              clearTimeout(timer.current)
+              navigate(value)
+            }
+          }}
+          placeholder="Search name, city, state or category…"
+          aria-label="Search saved leads"
           className="h-9 pl-9"
         />
       </div>
-      <div className="flex items-center gap-2">
-        <ToolbarButton icon={ListFilter} label="Filters" />
-        <ToolbarButton icon={ArrowUpDown} label="Sort" />
-        <ToolbarButton icon={Download} label="Export" />
-      </div>
+      {query && total !== null && (
+        <p className="text-xs text-muted-foreground tabular-nums" aria-live="polite">
+          {total} {total === 1 ? "match" : "matches"} for “{query}”
+        </p>
+      )}
     </div>
-  )
-}
-
-function ToolbarButton({
-  icon: Icon,
-  label,
-}: {
-  icon: React.ComponentType<{ className?: string }>
-  label: string
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        {/* aria-disabled keeps the button focusable so the tooltip is reachable */}
-        <Button
-          variant="outline"
-          size="sm"
-          aria-disabled="true"
-          onClick={(e) => e.preventDefault()}
-          className="flex-1 cursor-not-allowed text-muted-foreground opacity-70 hover:bg-background hover:text-muted-foreground active:scale-100 sm:flex-none"
-        >
-          <Icon className="size-4" />
-          {label}
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>Available once you have leads</TooltipContent>
-    </Tooltip>
   )
 }

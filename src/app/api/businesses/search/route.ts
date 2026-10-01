@@ -4,14 +4,17 @@ import {
   isBusinessSearchError,
   logBusinessSearchError,
 } from "@/lib/business-search/errors"
-import { getSupportedCategoryIds } from "@/lib/business-search/normalize-category"
+import {
+  getCategoryLabel,
+  getSupportedCategoryIds,
+} from "@/lib/business-search/normalize-category"
 import { searchBusinesses } from "@/lib/business-search/search-businesses"
 import { validateSearchRequest } from "@/lib/business-search/validate-request"
-import { saveLeads } from "@/lib/leads/save-leads"
+import { getSavedOsmIds } from "@/lib/leads/save-leads"
+import { recordSearch } from "@/lib/leads/searches"
 import type {
   BusinessSearchErrorResponse,
   BusinessSearchSuccessResponse,
-  LeadsSaveStatus,
 } from "@/types/business"
 
 // searchBusinesses caps itself at SEARCH_DEADLINE_MS (50s), under this limit.
@@ -20,7 +23,11 @@ export const maxDuration = 60
 const NO_STORE = { "Cache-Control": "no-store" }
 
 function errorResponse(error: BusinessSearchError) {
-  const body: BusinessSearchErrorResponse = { success: false, error: error.message }
+  const body: BusinessSearchErrorResponse = {
+    success: false,
+    error: error.message,
+    code: error.code,
+  }
   if (error.code === "unsupported_category") {
     body.supportedCategories = getSupportedCategoryIds()
   }
@@ -30,7 +37,7 @@ function errorResponse(error: BusinessSearchError) {
 /**
  * Returns the signed-in user's id, or null. Signed-in users only — except in
  * `next dev`, where anonymous requests are allowed so the endpoint can be
- * exercised with curl/Postman (their results just aren't saved).
+ * exercised with curl/Postman (nothing is recorded for them).
  */
 async function getRequestUser() {
   const supabase = await createClient()
@@ -72,18 +79,35 @@ export async function POST(request: Request) {
     const query = validateSearchRequest(body)
     const result = await searchBusinesses(query)
 
-    // Saving never hides results: a failed save is reported alongside them.
-    const leads: LeadsSaveStatus = userId
-      ? await saveLeads(supabase, userId, query, result.businesses)
-      : { status: "skipped", message: "Sign in to save results to your Leads." }
+    // Results are only saved when the user chooses to (saveLeadsAction).
+    // Here we just flag which ones they already have and log the search.
+    let savedOsmIds: string[] = []
+    if (userId) {
+      ;[savedOsmIds] = await Promise.all([
+        getSavedOsmIds(
+          supabase,
+          userId,
+          result.businesses.map((business) => business.osmId)
+        ),
+        recordSearch(supabase, userId, {
+          businessType: getCategoryLabel(result.query.normalizedBusinessType),
+          location: query.location,
+          resultCount: result.count,
+        }),
+      ])
+    }
 
-    const response: BusinessSearchSuccessResponse = { ...result, leads }
+    const response: BusinessSearchSuccessResponse = { ...result, savedOsmIds }
     return Response.json(response, { headers: NO_STORE })
   } catch (error) {
     logBusinessSearchError(error)
     if (isBusinessSearchError(error)) return errorResponse(error)
     return Response.json(
-      { success: false, error: "Something went wrong while searching. Please try again." },
+      {
+        success: false,
+        error: "Something went wrong while searching. Please try again.",
+        code: "internal_error",
+      } satisfies BusinessSearchErrorResponse,
       { status: 500, headers: NO_STORE }
     )
   }

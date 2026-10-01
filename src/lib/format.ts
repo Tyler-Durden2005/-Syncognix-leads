@@ -5,3 +5,8 @@ export function getInitials(name: string) {
   const last = parts.length > 1 ? parts[parts.length - 1][0] : ""
   return (first + last).toUpperCase()
 }
+
+/** "Plumbers" → "plumbers", but "HVAC companies" stays as is. */
+export function lowerFirst(text: string) {
+  return text.replace(/^[A-Z](?=[a-z])/, (c) => c.toLowerCase())
+}

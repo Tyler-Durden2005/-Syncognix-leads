@@ -2,15 +2,18 @@ import { Check } from "lucide-react"
 import { SectionCard } from "@/components/shared/section-card"
 import { cn } from "@/lib/utils"
 
-const steps = [
-  { title: "Create your account", done: true },
-  { title: "Search for businesses", done: false },
+const laterSteps = [
   { title: "Find business emails", done: false },
   { title: "Analyze lead quality", done: false },
   { title: "Generate outreach", done: false },
 ]
 
-export function GettingStarted() {
+export function GettingStarted({ hasSearched }: { hasSearched: boolean }) {
+  const steps = [
+    { title: "Create your account", done: true },
+    { title: "Search for businesses", done: hasSearched },
+    ...laterSteps,
+  ]
   const completed = steps.filter((step) => step.done).length
   const percent = Math.round((completed / steps.length) * 100)
 

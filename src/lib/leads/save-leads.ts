@@ -1,28 +1,29 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import type {
-  BusinessSearchQuery,
-  BusinessSearchResult,
-  LeadsSaveStatus,
-} from "@/types/business"
+import type { BusinessSearchResult, SaveLeadsResult } from "@/types/business"
 import type { Database } from "@/types/database"
 
 /** Postgres/PostgREST codes for "table doesn't exist". */
-const MISSING_TABLE_CODES = new Set(["42P01", "PGRST205"])
+export const MISSING_TABLE_CODES = new Set(["42P01", "PGRST205"])
+
+const SAVE_FAILED = "We couldn't save these leads. Please try again."
+const NOT_SET_UP =
+  "Leads can't be saved because the leads table hasn't been set up yet. Run the leads migration in Supabase."
 
 /**
- * Saves search results as the user's leads. Re-finding a business the user
- * already has refreshes its contact details instead of creating a duplicate;
- * its status (e.g. "contacted") is left untouched.
+ * Saves businesses as the user's leads in one batch. Businesses the user has
+ * already saved (same user_id + osm_id) are skipped by the database's unique
+ * constraint, so saving the same result twice never creates a duplicate and
+ * never overwrites an existing lead.
  */
 export async function saveLeads(
   supabase: SupabaseClient<Database>,
   userId: string,
-  query: BusinessSearchQuery,
-  businesses: BusinessSearchResult[]
-): Promise<LeadsSaveStatus> {
-  if (businesses.length === 0) return { status: "saved", count: 0 }
+  businesses: BusinessSearchResult[],
+  search: { businessType: string; location: string }
+): Promise<SaveLeadsResult> {
+  if (businesses.length === 0) return { ok: true, saved: 0, alreadySaved: 0, savedOsmIds: [] }
 
   const rows = businesses.map((business) => ({
     user_id: userId,
@@ -39,23 +40,51 @@ export async function saveLeads(
     category: business.category,
     latitude: business.latitude,
     longitude: business.longitude,
-    search_business_type: query.businessType,
-    search_location: query.location,
+    search_business_type: search.businessType,
+    search_location: search.location,
   }))
 
-  const { error } = await supabase
+  // ON CONFLICT DO NOTHING: only newly inserted rows come back.
+  const { data, error } = await supabase
     .from("leads")
-    .upsert(rows, { onConflict: "user_id,osm_id" })
+    .upsert(rows, { onConflict: "user_id,osm_id", ignoreDuplicates: true })
+    .select("osm_id")
 
   if (error) {
     console.error(`[leads] save failed: ${error.code ?? "unknown"} ${error.message}`)
     return {
-      status: "failed",
-      message: MISSING_TABLE_CODES.has(error.code ?? "")
-        ? "Results couldn't be saved because the leads table hasn't been set up yet. Run the leads migration in Supabase."
-        : "Results couldn't be saved to your Leads. Please try again.",
+      ok: false,
+      message: MISSING_TABLE_CODES.has(error.code ?? "") ? NOT_SET_UP : SAVE_FAILED,
     }
   }
 
-  return { status: "saved", count: rows.length }
+  const saved = data?.length ?? 0
+  return {
+    ok: true,
+    saved,
+    alreadySaved: rows.length - saved,
+    savedOsmIds: rows.map((row) => row.osm_id),
+  }
+}
+
+/** Which of `osmIds` the user has already saved. Empty on any error. */
+export async function getSavedOsmIds(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  osmIds: string[]
+): Promise<string[]> {
+  if (osmIds.length === 0) return []
+  const { data, error } = await supabase
+    .from("leads")
+    .select("osm_id")
+    .eq("user_id", userId)
+    .in("osm_id", osmIds)
+
+  if (error) {
+    if (!MISSING_TABLE_CODES.has(error.code ?? "")) {
+      console.error(`[leads] saved lookup failed: ${error.code ?? "unknown"} ${error.message}`)
+    }
+    return []
+  }
+  return (data ?? []).map((row) => row.osm_id)
 }

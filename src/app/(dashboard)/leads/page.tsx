@@ -1,49 +1,32 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { ChevronLeft, ChevronRight, CircleAlert, Database, Search, Users } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
+import { ChevronLeft, ChevronRight, CircleAlert, Database, Search, SearchX, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import { LocationText, PhoneLink, WebsiteLink } from "@/components/leads/business-cells"
+import { LeadsTable } from "@/components/leads/leads-table"
 import { LeadsToolbar } from "@/components/leads/leads-toolbar"
 import { EmptyState } from "@/components/shared/empty-state"
 import { FadeIn } from "@/components/shared/motion"
 import { PageHeader } from "@/components/shared/page-header"
 import { requireUser } from "@/lib/auth/user"
+import { getCategoryLabel } from "@/lib/business-search/normalize-category"
 import { getLeadsPage } from "@/lib/leads/get-leads"
-import type { LeadStatus } from "@/types"
 
 export const metadata: Metadata = { title: "Leads" }
 
-const columns = ["Business", "Website", "Phone", "Location", "Status", "Added"]
-
-const STATUS_LABELS: Record<LeadStatus, string> = {
-  new: "New",
-  contacted: "Contacted",
-  replied: "Replied",
-  qualified: "Qualified",
-  archived: "Archived",
+function first(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value
 }
 
-const dateFormat = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" })
-
-function parsePage(value: string | string[] | undefined) {
-  const page = Number(Array.isArray(value) ? value[0] : value)
+function parsePage(value: string | undefined) {
+  const page = Number(value)
   return Number.isInteger(page) && page > 0 ? page : 1
 }
 
-function FindLeadsButton({ label = "Find Leads" }: { label?: string }) {
+function FindLeadsButton() {
   return (
     <Button asChild size="sm">
       <Link href="/find-leads">
-        <Search /> {label}
+        <Search /> Find Leads
       </Link>
     </Button>
   )
@@ -51,16 +34,22 @@ function FindLeadsButton({ label = "Find Leads" }: { label?: string }) {
 
 export default async function LeadsPage(props: PageProps<"/leads">) {
   const user = await requireUser()
-  const page = parsePage((await props.searchParams).page)
-  const result = await getLeadsPage(user.id, page)
+  const params = await props.searchParams
+  const page = parsePage(first(params.page))
+  const query = (first(params.q) ?? "").trim().slice(0, 100)
+  const result = await getLeadsPage(user.id, page, query)
 
   const total = result.status === "ok" ? result.total : 0
+  const rows =
+    result.status === "ok"
+      ? result.leads.map((lead) => ({ ...lead, categoryLabel: getCategoryLabel(lead.category) }))
+      : []
 
   return (
     <div className="space-y-8">
       <PageHeader
         title="Leads"
-        description="Every business you discover, saved in one place."
+        description="Businesses you've saved from your searches."
         actions={
           <Button asChild>
             <Link href="/find-leads">
@@ -72,13 +61,15 @@ export default async function LeadsPage(props: PageProps<"/leads">) {
 
       <FadeIn>
         <div className="overflow-hidden rounded-lg border bg-card shadow-xs">
-          <LeadsToolbar />
+          {(total > 0 || query) && (
+            <LeadsToolbar query={query} total={result.status === "ok" ? total : null} />
+          )}
 
           {result.status === "not_set_up" && (
             <EmptyState
               icon={Database}
               title="The leads table isn't set up yet."
-              description="Run supabase/migrations/20261001000000_create_leads.sql in the Supabase SQL Editor, then refresh this page."
+              description="Run the SQL files in supabase/migrations in the Supabase SQL Editor, then refresh this page."
               className="py-16"
             />
           )}
@@ -92,90 +83,68 @@ export default async function LeadsPage(props: PageProps<"/leads">) {
             />
           )}
 
-          {result.status === "ok" && result.leads.length === 0 && (
-            <EmptyState
-              icon={Users}
-              title={result.total === 0 ? "No leads yet." : "No leads on this page."}
-              description={
-                result.total === 0
-                  ? "Businesses you find are saved here automatically with their website, phone and address."
-                  : "This page is past the end of your list."
-              }
-              className="py-16"
-              action={
-                result.total === 0 ? (
-                  <FindLeadsButton label="Find Your First Leads" />
-                ) : (
+          {result.status === "ok" && rows.length === 0 && (
+            query ? (
+              <EmptyState
+                icon={SearchX}
+                title="No saved leads match your search."
+                description="Try a different business name, city, state or category."
+                className="py-16"
+                action={
+                  <Button asChild size="sm" variant="outline">
+                    <Link href="/leads">Clear search</Link>
+                  </Button>
+                }
+              />
+            ) : total === 0 ? (
+              <EmptyState
+                icon={Users}
+                title="No saved leads yet."
+                description="Search for businesses and save the ones you want to work with."
+                className="py-16"
+                action={<FindLeadsButton />}
+              />
+            ) : (
+              <EmptyState
+                icon={Users}
+                title="No leads on this page."
+                description="This page is past the end of your list."
+                className="py-16"
+                action={
                   <Button asChild size="sm" variant="outline">
                     <Link href="/leads">Back to first page</Link>
                   </Button>
-                )
-              }
-            />
+                }
+              />
+            )
           )}
 
-          {result.status === "ok" && result.leads.length > 0 && (
-            <Table>
-              <TableHeader className="bg-muted/40">
-                <TableRow className="hover:bg-transparent">
-                  {columns.map((column) => (
-                    <TableHead
-                      key={column}
-                      className="h-10 px-4 text-xs font-medium whitespace-nowrap text-muted-foreground first:pl-5 last:pr-5 last:text-right"
-                    >
-                      {column}
-                    </TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {result.leads.map((lead) => (
-                  <TableRow key={lead.id}>
-                    <TableCell className="px-4 py-3 pl-5 align-top">
-                      <div className="min-w-44 font-medium text-foreground">{lead.name}</div>
-                      <Badge variant="secondary" className="mt-1 font-normal capitalize">
-                        {lead.category}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="px-4 py-3 align-top">
-                      <WebsiteLink url={lead.website} />
-                    </TableCell>
-                    <TableCell className="px-4 py-3 align-top">
-                      <PhoneLink phone={lead.phone} />
-                    </TableCell>
-                    <TableCell className="px-4 py-3 align-top whitespace-normal">
-                      <LocationText address={lead.address} city={lead.city} state={lead.state} />
-                    </TableCell>
-                    <TableCell className="px-4 py-3 align-top">
-                      <Badge variant="outline" className="font-normal">
-                        {STATUS_LABELS[lead.status] ?? lead.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="px-4 py-3 pr-5 text-right align-top whitespace-nowrap text-muted-foreground tabular-nums">
-                      {dateFormat.format(new Date(lead.created_at))}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+          {rows.length > 0 && <LeadsTable leads={rows} />}
 
-          <div className="flex items-center justify-between gap-3 border-t px-5 py-3 text-xs text-muted-foreground">
-            <span className="tabular-nums">
-              {total} {total === 1 ? "lead" : "leads"}
-            </span>
-            {result.status === "ok" && (
-              <Pagination page={result.page} pageCount={result.pageCount} />
-            )}
-          </div>
+          {result.status === "ok" && total > 0 && (
+            <div className="flex items-center justify-between gap-3 border-t px-5 py-3 text-xs text-muted-foreground">
+              <span className="tabular-nums">
+                {total} {total === 1 ? "lead" : "leads"}
+                {query && " found"}
+              </span>
+              <Pagination page={result.page} pageCount={result.pageCount} query={query} />
+            </div>
+          )}
         </div>
       </FadeIn>
     </div>
   )
 }
 
-function Pagination({ page, pageCount }: { page: number; pageCount: number }) {
-  const href = (target: number) => (target <= 1 ? "/leads" : `/leads?page=${target}`)
+function Pagination({ page, pageCount, query }: { page: number; pageCount: number; query: string }) {
+  if (pageCount <= 1) return null
+  const href = (target: number) => {
+    const search = new URLSearchParams()
+    if (query) search.set("q", query)
+    if (target > 1) search.set("page", String(target))
+    const qs = search.toString()
+    return qs ? `/leads?${qs}` : "/leads"
+  }
   return (
     <nav aria-label="Leads pages" className="flex items-center gap-2">
       <span className="tabular-nums">

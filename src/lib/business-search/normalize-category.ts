@@ -1,3 +1,4 @@
+import type { CategoryOption } from "@/types/business"
 import { BUSINESS_CATEGORIES, type BusinessCategory } from "./category-map"
 
 /** Lowercases, turns -/_ into spaces and collapses whitespace. */
@@ -19,4 +20,17 @@ export function resolveBusinessCategory(input: string): BusinessCategory | null 
 
 export function getSupportedCategoryIds() {
   return BUSINESS_CATEGORIES.map((category) => category.id)
+}
+
+/** Supported categories for the search form, without their OSM tags. */
+export function getCategoryOptions(): CategoryOption[] {
+  return BUSINESS_CATEGORIES.map(({ id, label, plural, aliases }) => ({ id, label, plural, aliases }))
+}
+
+/** Friendly name for a stored category id, e.g. "car wash" → "Car wash". */
+export function getCategoryLabel(id: string) {
+  const category = resolveBusinessCategory(id)
+  if (category) return category.label
+  const text = id.replace(/[-_]+/g, " ").trim()
+  return text ? text[0].toUpperCase() + text.slice(1) : "Business"
 }

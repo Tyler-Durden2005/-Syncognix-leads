@@ -142,3 +142,13 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Indeterminate progress bar on Find Leads while a search runs. */
+@keyframes search-progress {
+  0% {
+    left: -33%;
+  }
+  100% {
+    left: 100%;
+  }
+}

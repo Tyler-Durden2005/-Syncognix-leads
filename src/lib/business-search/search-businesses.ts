@@ -54,7 +54,7 @@ const resultCache = new TtlCache<CachedResults>(RESULT_CACHE_TTL_MS, RESULT_CACH
  */
 export async function searchBusinesses(
   query: BusinessSearchQuery
-): Promise<Omit<BusinessSearchSuccessResponse, "leads">> {
+): Promise<Omit<BusinessSearchSuccessResponse, "savedOsmIds">> {
   // Resolve the category before any network call so unsupported types cost nothing.
   const category = resolveBusinessCategory(query.businessType)
   if (!category) {

@@ -65,22 +65,37 @@ export interface BusinessSearchSuccessResponse {
     /** Set when results may be incomplete (e.g. a source was busy). */
     notice?: string
   }
-  /** Whether the results were saved to the signed-in user's leads. */
-  leads: LeadsSaveStatus
+  /** osmIds from these results the signed-in user has already saved. */
+  savedOsmIds: string[]
 }
-
-export type LeadsSaveStatus =
-  | { status: "saved"; count: number }
-  | { status: "failed"; message: string }
-  /** No signed-in user (only possible in `next dev`), so nothing was saved. */
-  | { status: "skipped"; message: string }
 
 export interface BusinessSearchErrorResponse {
   success: false
   error: string
+  /** Machine-readable reason, e.g. "location_not_us". */
+  code: string
   supportedCategories?: string[]
 }
 
 export type BusinessSearchResponse =
   | BusinessSearchSuccessResponse
   | BusinessSearchErrorResponse
+
+/** A supported business type as shown in the search form (no OSM tags). */
+export interface CategoryOption {
+  id: string
+  label: string
+  plural: string
+  aliases: string[]
+}
+
+/** What the client sends to save leads: a search result plus its search. */
+export interface SaveLeadsInput {
+  businesses: BusinessSearchResult[]
+  businessType: string
+  location: string
+}
+
+export type SaveLeadsResult =
+  | { ok: true; saved: number; alreadySaved: number; savedOsmIds: string[] }
+  | { ok: false; message: string }

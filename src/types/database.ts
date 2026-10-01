@@ -48,6 +48,10 @@ export type Database = {
           search_business_type: string | null
           search_location: string | null
           status: LeadStatus
+          /** Optional until the 20261002 migration has been applied. */
+          source?: string
+          country?: string
+          country_code?: string
           created_at: string
           updated_at: string
         }
@@ -86,6 +90,26 @@ export type Database = {
         }
         Relationships: []
       }
+      searches: {
+        Row: {
+          id: string
+          user_id: string
+          business_type: string
+          location: string
+          result_count: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string
+          business_type: string
+          location: string
+          result_count?: number
+          created_at?: string
+        }
+        Update: Record<string, never>
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>
@@ -98,3 +122,4 @@ export type LeadStatus = "new" | "contacted" | "replied" | "qualified" | "archiv
 
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"]
 export type Lead = Database["public"]["Tables"]["leads"]["Row"]
+export type SearchHistoryEntry = Database["public"]["Tables"]["searches"]["Row"]

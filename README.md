@@ -1,6 +1,6 @@
 # Syncognix Leads
 
-Lead intelligence and outreach platform. **Step 1 — application foundation**: authentication, protected app shell, dashboard and placeholder pages ready for lead search (Step 2).
+Lead intelligence and outreach platform. **Step 1** — authentication, protected app shell and dashboard. **Step 2** — US business search (OpenStreetMap), selecting and saving businesses as leads, and a searchable Leads list.
 
 ## Stack
 
@@ -17,7 +17,10 @@ Next.js 16 (App Router, Turbopack) · React 19 · TypeScript · Tailwind CSS v4 
    cp .env.example .env.local
    ```
    Fill in `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` (Project Settings → API).
-3. **Run the SQL** in `supabase/migrations/20260930000000_create_profiles.sql` via the Supabase SQL Editor (or `supabase db push`). It creates `profiles`, RLS policies, and a trigger that creates a profile on sign-up.
+3. **Run the SQL** files in `supabase/migrations/`, oldest first, via the Supabase SQL Editor (or `supabase db push`). Each is safe to re-run.
+   - `20260930000000_create_profiles.sql` — `profiles`, RLS, and a trigger that creates a profile on sign-up.
+   - `20261001000000_create_leads.sql` — `leads`, RLS, and the `unique (user_id, osm_id)` duplicate guard.
+   - `20261002000000_leads_source_and_searches.sql` — lead `source`/`country` columns and the `searches` history table (dashboard "Recent searches").
 4. **Configure Auth URLs** (Authentication → URL Configuration):
    - Site URL: `http://localhost:3000` (your production URL later)
    - Redirect URLs: `http://localhost:3000/auth/confirm`

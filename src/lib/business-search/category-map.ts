@@ -15,6 +15,8 @@ export interface BusinessCategory {
   /** Stable id returned to clients as `category`. */
   id: string
   label: string
+  /** Used in headings, e.g. "Plumbers near Dallas, Texas". */
+  plural: string
   /** Extra phrases users might type for the same category. */
   aliases: string[]
   tags: OsmTagFilter[]
@@ -24,48 +26,56 @@ export const BUSINESS_CATEGORIES: readonly BusinessCategory[] = [
   {
     id: "plumber",
     label: "Plumber",
+    plural: "Plumbers",
     aliases: ["plumbers", "plumbing"],
     tags: [{ key: "craft", value: "plumber" }],
   },
   {
     id: "dentist",
     label: "Dentist",
+    plural: "Dentists",
     aliases: ["dentists", "dental", "dental clinic", "dental office"],
     tags: [{ key: "amenity", value: "dentist" }],
   },
   {
     id: "restaurant",
     label: "Restaurant",
+    plural: "Restaurants",
     aliases: ["restaurants"],
     tags: [{ key: "amenity", value: "restaurant" }],
   },
   {
     id: "car wash",
     label: "Car wash",
+    plural: "Car washes",
     aliases: ["car washes", "carwash", "carwashes"],
     tags: [{ key: "amenity", value: "car_wash" }],
   },
   {
     id: "car repair",
     label: "Car repair",
+    plural: "Car repair shops",
     aliases: ["auto repair", "car mechanic", "auto mechanic", "mechanic", "mechanics", "auto shop"],
     tags: [{ key: "shop", value: "car_repair" }],
   },
   {
     id: "electrician",
     label: "Electrician",
+    plural: "Electricians",
     aliases: ["electricians", "electrical contractor", "electrical contractors"],
     tags: [{ key: "craft", value: "electrician" }],
   },
   {
     id: "roofing",
     label: "Roofing",
+    plural: "Roofers",
     aliases: ["roofer", "roofers", "roofing contractor", "roofing contractors", "roofing company"],
     tags: [{ key: "craft", value: "roofer" }],
   },
   {
     id: "landscaping",
     label: "Landscaping",
+    plural: "Landscapers",
     aliases: ["landscaper", "landscapers", "landscaping company", "lawn care"],
     // Many US landscapers are tagged craft=gardener rather than craft=landscaper.
     tags: [
@@ -76,12 +86,14 @@ export const BUSINESS_CATEGORIES: readonly BusinessCategory[] = [
   {
     id: "cleaning",
     label: "Cleaning",
+    plural: "Cleaning services",
     aliases: ["cleaner", "cleaners", "cleaning service", "cleaning services", "cleaning company", "janitorial"],
     tags: [{ key: "craft", value: "cleaning" }],
   },
   {
     id: "hvac",
     label: "HVAC",
+    plural: "HVAC companies",
     aliases: ["hvac contractor", "hvac contractors", "heating and cooling", "air conditioning", "ac repair"],
     tags: [{ key: "craft", value: "hvac" }],
   },
@@ -90,6 +102,7 @@ export const BUSINESS_CATEGORIES: readonly BusinessCategory[] = [
     // related places. Refine the tags here once better data sources exist.
     id: "auto detailing",
     label: "Auto detailing",
+    plural: "Auto detailers",
     aliases: ["car detailing", "mobile detailing", "detailing", "auto detailer", "car detailer", "detailer"],
     tags: [
       { key: "amenity", value: "car_wash" },

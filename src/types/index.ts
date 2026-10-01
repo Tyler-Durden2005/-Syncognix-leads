@@ -1,4 +1,4 @@
-export type { Lead, LeadStatus, Profile } from "./database"
+export type { Lead, LeadStatus, Profile, SearchHistoryEntry } from "./database"
 
 /** The signed-in user as consumed by UI components. */
 export type AppUser = {
